@@ -37,6 +37,8 @@ where
     size_y: u16,
     // Current orientation
     orientation: Orientation,
+    x_start: u16, // what row idx to translate 0 to (for 240x240 displays in PortaitSwapped)
+    y_start: u16  // what col idx to translate 0 to (for 240x240 displays in LandscapeSwapped)
 }
 
 ///
@@ -88,6 +90,8 @@ where
             size_x,
             size_y,
             orientation: Orientation::default(),
+            x_start: 0,
+            y_start: 0
         }
     }
 
@@ -152,6 +156,14 @@ where
         self.write_command(Instruction::MADCTL)?;
         self.write_data(&[orientation as u8])?;
         self.orientation = orientation;
+        let (xs, ys) = match (self.size_y, self.orientation) {
+            (_, Orientation::Portrait) => (0,0),  // gap would be at the bottom
+            (_, Orientation::Landscape) => (0,0), // gap would be at the right
+            (sy, Orientation::PortraitSwapped) => (0, 320 - sy),
+            (sy, Orientation::LandscapeSwapped) => (320 - sy, 0)
+        };
+        self.x_start = xs;
+        self.y_start = ys;
         Ok(())
     }
 
@@ -244,10 +256,10 @@ where
         ey: u16,
     ) -> Result<(), Error<PinE>> {
         self.write_command(Instruction::CASET)?;
-        self.write_data(&sx.to_be_bytes())?;
-        self.write_data(&ex.to_be_bytes())?;
+        self.write_data(&(sx + self.x_start).to_be_bytes())?;
+        self.write_data(&(ex + self.x_start).to_be_bytes())?;
         self.write_command(Instruction::RASET)?;
-        self.write_data(&sy.to_be_bytes())?;
-        self.write_data(&ey.to_be_bytes())
+        self.write_data(&(sy + self.y_start).to_be_bytes())?;
+        self.write_data(&(ey + self.y_start).to_be_bytes())
     }
 }
